@@ -1,0 +1,3 @@
+[submodule "event_based/SuperEvent"]
+	path = event_based/SuperEvent
+	url = https://github.com/ethz-mrl/SuperEvent.git

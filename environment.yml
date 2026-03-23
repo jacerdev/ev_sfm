@@ -1,0 +1,21 @@
+name: evis_geoba
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - ipykernel
+  - kornia
+  - matplotlib
+  - numpy
+  - pandas
+  - python=3.11
+  - pytorch
+  - scipy
+  - scipy-stubs
+  - torchvision
+  - tqdm
+  # optional
+  - opencv
+  # submodule dependencies
+  - h5py
+

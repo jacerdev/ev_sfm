@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+
+# Files
+
+
+# Folders
+/experiments/
+
+# Other
+/.idea/
+/.git/
