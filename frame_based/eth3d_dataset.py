@@ -188,8 +188,7 @@ class FrameDataset:
         return rot_angle_err, t_angle_err, t_norm_err
 
 
-# broken implementation cuz objects changed
-from sfm.objects import PinholeCamera, Point, Frame
+from sfm.objects import PinholeCamera, Point, Frame, extract_sfm_scene
 
 def build_scene_graph(dataset):
     """
@@ -198,38 +197,63 @@ def build_scene_graph(dataset):
     - frames: List of Frame objects (fully linked)
     - points3d: Dict {point3d_id: Point3D_Object}
     """
-
-    # Create Shared Camera Model
+    # create shared camera model
     intrinsics = dataset.intrinsics
     K = np.eye(3)
     K[0, 0], K[1, 1], K[0, 2], K[1, 2] = intrinsics["params"]
-    camera_model = PinholeCamera(K, intrinsics["width"], intrinsics["height"])
+    camera_model = PinholeCamera(K, height=intrinsics["height"], width=intrinsics["width"])
 
-    # Create All 3D Points
+    # create all 3D points
     points3d = {}
     for pt3d_id, p_data in dataset.points3d.items():
-        pt3d_obj = Point(pt3d_id, p_data["xyz"], p_data["rgb"])
+        pt3d_obj = Point(xyz=p_data["xyz"], id=pt3d_id, rgb=p_data["rgb"])
         points3d[pt3d_id] = pt3d_obj
 
-    # Create Frames and Link to 3D Points
+    # create frames and link to 3D points
     frames = []
     for i in range(len(dataset.frame_ids)):
         img_id = dataset.frame_ids[i]
         R, t = dataset.extrinsics[i]
-        frame = Frame(img_id, camera_model, R, t)
+        frame = Frame(model=camera_model, R=R, t=t, frame_id=img_id, rgb=(255,0,0))
 
-        # Get 2D points and their 3D references for this image
+        # get 2D points and their 3D references for this image
         points2d = dataset.all_points2d[i]
         point3d_refs = dataset.all_point3d_refs[i]
+        
+        kps = []
+        pts_obj = []
         for idx, pt2d in enumerate(points2d):
             # iterate by index to match the order in dataset lists
-            # idx is to be discarded and observations will be assigned new indices in frame.add_keypoint
+            # idx is to be discarded and observations will be assigned new indices
             if idx in point3d_refs:
                 pt3d_id = point3d_refs[idx]
                 if pt3d_id in points3d:
-                    pt3d_obj = points3d[pt3d_id]
-                    frame.add_keypoint(pt2d, pt3d_obj)
+                    kps.append(pt2d)
+                    pts_obj.append(points3d[pt3d_id])
+                    
+        if kps:
+            frame.add_observations(kps, pts_obj)
 
         frames.append(frame)
 
     return camera_model, frames, points3d
+
+
+if __name__ == "__main__":
+    data_path = "data/ETH3D/delivery_area_undistorted"
+
+    import sys
+    import matplotlib
+    matplotlib.use('TkAgg')
+    from utils.visualization import plot_sfm
+
+    print(f"Loading ETH3D dataset from {data_path}")
+    
+    dataset = FrameDataset(root_dir=data_path)
+    camera_model, frames, points3d = build_scene_graph(dataset)
+
+    sfm_scene = extract_sfm_scene(frames, list(points3d.values()), pt_stride=50, colored_pts=True)
+    
+    print("Plotting Scene...")
+    plot_sfm(**sfm_scene, camera_size=1, point_size=10)
+    

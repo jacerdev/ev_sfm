@@ -1,0 +1,3 @@
+- https://www.eth3d.net/data/delivery_area_rig_undistorted.7z
+- https://www.eth3d.net/data/electro_rig_undistorted.7z
+- ...

@@ -1,0 +1,2 @@
+- https://rpg.ifi.uzh.ch/datasets/davis/slider_depth.zip
+- https://rpg.ifi.uzh.ch/datasets/davis/urban.zip

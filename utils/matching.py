@@ -109,28 +109,6 @@ def _robust_match(descs1, descs2, matcher_instance, ratio):
     return matches, distances
 
 
-def get_buckets(kp1, kp2, bin_size):
-    buckets1, buckets2 = {}, {}
-    for i, p in enumerate(kp1):
-        x, y = p[:2]
-        buckets1.setdefault((int(y // bin_size), int(x // bin_size)), []).append(i)
-    for i, p in enumerate(kp2):
-        x, y = p[:2]
-        buckets2.setdefault((int(y // bin_size), int(x // bin_size)), []).append(i)
-
-    pairs = []
-    for (r, c), idx1 in buckets1.items():
-        idx2_window = []
-        for dr in [-1, 0, 1]:
-            for dc in [-1, 0, 1]:
-                if (r + dr, c + dc) in buckets2:
-                    idx2_window.extend(buckets2[(r + dr, c + dc)])
-
-        if idx2_window:
-            pairs.append((idx1, idx2_window))
-    return pairs
-
-
 def match_features_windowed(feats1, feats2, bin_size, match_features_func):
     kp1 = feats1['keypoints']
     kp2 = feats2['keypoints']
@@ -172,50 +150,25 @@ def match_features_windowed(feats1, feats2, bin_size, match_features_func):
 
     return final_matches, final_scores
 
-"""
-if deterministic:
-    # Fork RNG ensures we don't mess up global randomness outside this function
-    dev_idx = [device.index] if device.type == 'cuda' else []
-    with torch.random.fork_rng(devices=dev_idx):
-        torch.manual_seed(0)
-        with torch.inference_mode():
-            out = loftr_model(input_dict)
-else:
-    with torch.inference_mode():
-        out = loftr_model(input_dict)
-"""
+def get_buckets(kp1, kp2, bin_size):
+    buckets1, buckets2 = {}, {}
+    for i, p in enumerate(kp1):
+        x, y = p[:2]
+        buckets1.setdefault((int(y // bin_size), int(x // bin_size)), []).append(i)
+    for i, p in enumerate(kp2):
+        x, y = p[:2]
+        buckets2.setdefault((int(y // bin_size), int(x // bin_size)), []).append(i)
 
-"""
-def match_features_flann_robust(feats1, feats2, flann_instance, ratio=0.75):
-    descs1 = feats1["descriptors"]
-    descs2 = feats2["descriptors"]
+    pairs = []
+    for (r, c), idx1 in buckets1.items():
+        idx2_window = []
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if (r + dr, c + dc) in buckets2:
+                    idx2_window.extend(buckets2[(r + dr, c + dc)])
 
-    # forward and backward kNN
-    knn12 = flann_instance.knnMatch(descs1, descs2, k=2)
-    knn21 = flann_instance.knnMatch(descs2, descs1, k=2)
-
-    # forward and backward ratio filter
-    fwd = {}
-    for i, (m, n) in enumerate(knn12):
-        if m.distance < ratio * n.distance: fwd[i] = m
-    bwd = {}
-    for j, (m, n) in enumerate(knn21):
-        if m.distance < ratio * n.distance: bwd[j] = m
-
-    # mutual nearest check
-    matches = np.full(len(descs1), -1, dtype=int)
-    distances = np.full(len(descs1), np.inf, dtype=float)
-    for i, m in fwd.items():
-        j = m.trainIdx
-        if j in bwd and bwd[j].trainIdx == i:
-            matches[i] = j
-            distances[i] = m.distance
-
-    scores = np.exp(-distances) * feats1.get("scores", 1.0)
-    return matches, scores
-"""
-
-
-
+        if idx2_window:
+            pairs.append((idx1, idx2_window))
+    return pairs
 
 

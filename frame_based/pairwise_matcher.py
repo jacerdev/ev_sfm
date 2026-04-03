@@ -1,11 +1,10 @@
-import cv2
 import kornia.feature as KF
 import logging
 import numpy as np
 from pathlib import Path
 import torch
 
-from utils.preprocessing import load_image, ensure_batch
+from utils.utils import load_image, ensure_batch
 
 
 class PairwiseMatcher:
@@ -100,56 +99,9 @@ def extract_matches_loftr(imgs1, imgs2, loftr_model, min_conf=.2):
 
     return results
 
+"""
 def clean_gpu():
-    """Force garbage collection and clear CUDA cache."""
+    Force garbage collection and clear CUDA cache.
     import gc
     gc.collect()
-    torch.cuda.empty_cache()
-
-def extract_matches_classic(img1, img2):
-    sift = cv2.SIFT_create()
-    kp1_obj, des1 = sift.detectAndCompute(img1, None)
-    kp2_obj, des2 = sift.detectAndCompute(img2, None)
-    if des1 is None or des2 is None: return np.array([]), np.array([])
-    kp1 = np.array([kp.pt for kp in kp1_obj], dtype=np.float32)
-    kp2 = np.array([kp.pt for kp in kp2_obj], dtype=np.float32)
-
-    bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-    matches = bf.match(des1, des2)
-    matches = sorted(matches, key=lambda x: x.distance) # sort SIFT matches by distance to simulate confidence
-    idx1 = np.array([m.queryIdx for m in matches])
-    idx2 = np.array([m.trainIdx for m in matches])
-    return kp1[idx1], kp2[idx2]
-
-"""
-BATCH_SIZE = 2
-def compute_and_save_matches(image_paths, loftr, matches_dir=Path(out_dir)/"matches"):
-    matches_dir = Path(matches_dir)
-    matches_dir.mkdir(parents=True, exist_ok=True)
-
-    pairs = []
-    for i in range(len(image_paths) - 1):
-        pairs.append((image_paths[i], image_paths[i+1]))
-
-    for i in range(0, len(pairs), BATCH_SIZE):
-        batch_pairs = pairs[i : i + BATCH_SIZE]
-        imgs1 = np.array([load_image(p1) for p1, p2 in batch_pairs])
-        imgs2 = np.array([load_image(p2) for p1, p2 in batch_pairs])
-        batch_results = extract_correspondences(imgs1, imgs2, loftr)
-
-        for idx, (kpts1, kpts2) in enumerate(batch_results):
-            p1, p2 = batch_pairs[idx]
-            np.savez(matches_dir / (f"{p1.stem}_{p2.stem}" + ".npz"), kps1=kpts1, kps2=kpts2)
-
-        del imgs1, imgs2, batch_results
-        clean_gpu()
-
-compute_and_save_matches(image_paths, kp_matcher)
-
-idx= 132
-path0 = image_paths[idx]
-path1 = image_paths[idx+1]
-img0, img1 = load_image(path0), load_image(path1)
-pts0_px, pts1_px = match_keypoints(path0, path1)
-plot_images(draw_matches(img0, img1, pts0_px, pts1_px, match_stride=20))
-"""
+    torch.cuda.empty_cache()"""

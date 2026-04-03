@@ -3,10 +3,16 @@ __pycache__/
 
 # Files
 
-
 # Folders
-/experiments/
+/sandbox/
+/data/outputs/
+/data/ETH3D/delivery_area_undistorted
+/data/ETH3D/electro_rig_undistorted
+/data/UZH/urban
 
-# Other
+# IDE
 /.idea/
+/.vscode/
+
+# Git
 /.git/

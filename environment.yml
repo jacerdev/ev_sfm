@@ -14,7 +14,6 @@ dependencies:
   - scipy-stubs
   - torchvision
   - tqdm
-  # optional
   - opencv
   # submodule dependencies
   - h5py

@@ -11,6 +11,7 @@ def PnP_linear(K, x, X):
     x, X: (N, 2) , X: (N, 3)
     Returns: R (3,3), t (3,)
     """
+    # standard PnP is so bad
     """if x.shape[1] == 2: x_h = np.c_[x, np.ones(x.shape[0])]
     else: x_h = x
     x_norm = (np.linalg.inv(K) @ x_h.T).T
@@ -49,17 +50,9 @@ def RANSAC_PnP(K, x, X, p=.999, e= .35, thresh=3.0, min_iters=100, max_iters=100
             return inliers.flatten(), (R, tvec.flatten())
         else: return np.array([], dtype=int), None
 
+
     sample_size = 6
 
-    """def estimator(x, X):
-        return dlt_projection_matrix(x, X)
-
-    def error_fn(P, x, X):
-        if X.shape[1] == 3: X = np.c_[X, np.ones(X.shape[0])]
-        PX = P @ X.T
-        PX = PX[:2, :] / PX[2, :]
-        return np.linalg.norm(x[:,:2] - PX.T, axis=1)
-    """
     def estimator(x_sample, X_sample):
         return PnP_linear(K, x_sample, X_sample)
 
@@ -106,41 +99,37 @@ def PnP_residuals(K, rvec, tvec, x, X):
     return e.ravel()
 
 def PnP_jacobian(K, rvec, tvec, X):
-    """
-    Fixed Jacobian implementation handling OpenCV's (3,9) output shape.
-    """
     N = X.shape[0]
     fx, fy = K[0, 0], K[1, 1]
 
-    # 1. Get Rotation and Jacobian
+    # Get Rotation and Jacobian
     R, dR_drvec = cv2.Rodrigues(rvec)
 
-    # --- CRITICAL FIX ---
     # cv2.Rodrigues returns (3, 9) [rows=params, cols=R_elements]
-    # We need (9, 3) [rows=R_elements, cols=params] for our tensor logic
+    # we need (9, 3) [rows=R_elements, cols=params]
     if dR_drvec.shape == (3, 9):
         dR_drvec = dR_drvec.T
 
-        # Now reshape to (3, 3, 3) -> (row_R, col_R, param_rvec)
+    # reshape to (3, 3, 3) -> (row_R, col_R, param_rvec)
     dR_d_rvec_tensor = dR_drvec.reshape(3, 3, 3)
 
-    # 2. Project points
+    # Project points
     p = (X @ R.T) + tvec.reshape(1, 3)
     x, y, z = p[:, 0], p[:, 1], p[:, 2]
     z = np.where(np.abs(z) < 1e-9, 1e-9, z)
     inv_z = 1.0 / z
     inv_z2 = inv_z ** 2
 
-    # 3. Jacobian of Projection
+    # Jacobian of Projection
     du_dp = np.stack([fx * inv_z, np.zeros(N), -fx * x * inv_z2], axis=1)
     dv_dp = np.stack([np.zeros(N), fy * inv_z, -fy * y * inv_z2], axis=1)
 
-    # 4. Jacobian wrt Translation
+    # Jacobian wrt Translation
     J_t = np.zeros((2 * N, 3))
     J_t[0::2, :] = du_dp
     J_t[1::2, :] = dv_dp
 
-    # 5. Jacobian wrt Rotation
+    # Jacobian wrt Rotation
     # d(R*X)/drvec: Sum over cols of R (dim 1) and cols of X (dim 1)
     # Tensor: (row_R, col_R, param) @ (point, col_X)
     dp_dr = np.einsum('ijk,nj->nik', dR_d_rvec_tensor, X)
@@ -151,48 +140,6 @@ def PnP_jacobian(K, rvec, tvec, X):
     J_r = np.zeros((2 * N, 3))
     J_r[0::2, :] = J_ru
     J_r[1::2, :] = J_rv
-
-    J = np.hstack([J_r, J_t])
-    return J
-
-def PnP_jacobian_old(K, rvec, tvec, X):
-    """
-    X: (N, 3)
-    Returns: (2*N, 6) Jacobian
-    """
-    R = rodrigues_to_R(rvec)
-    N = X.shape[0]
-
-    # project points
-    p = (R @ X.T).T + tvec.reshape(1, 3)
-    px, py, pz = p[:, 0], p[:, 1], p[:, 2]
-    pz = np.where(np.abs(pz) < 1e-9, 1e-9, pz) # Avoid division by zero
-    inv_z = 1.0 / pz
-    inv_z2 = inv_z ** 2
-
-    fx, fy = K[0, 0], K[1, 1]
-
-    # precompute du_dp and dv_dp
-    # d(u)/dp = [fx/z,   0,  -fx*x/z^2]
-    # d(v)/dp = [   0, fy/z, -fy*y/z^2]
-    du_dp = np.stack([fx * inv_z, np.zeros(N), -fx * px * inv_z2], axis=1)  # (N, 3)
-    dv_dp = np.stack([np.zeros(N), fy * inv_z, -fy * py * inv_z2], axis=1)  # (N, 3)
-
-    # jacobian wrt Translation is just du_dp and dv_dp because dp/dt = Identity
-    J_t = np.zeros((2 * N, 3))
-    J_t[0::2, :] = du_dp
-    J_t[1::2, :] = dv_dp
-
-    # jacobian wrt Rotation d(proj)/d(rvec) = d(proj)/d(p) * d(p)/d(rvec)
-    # where dp/drvec ~ -R * [X]_skew (rodrigues formula)
-    J_r = np.zeros((2 * N, 3))
-    for i in range(N):
-        Xi = X[i, :]
-        dp_dr = -R @ np.array([[0, -Xi[2], Xi[1]],
-                               [Xi[2], 0, -Xi[0]],
-                               [-Xi[1], Xi[0], 0]])
-        J_point = np.vstack([du_dp[i], dv_dp[i]])
-        J_r[2 * i: 2 * i + 2, :] = J_point @ dp_dr # Combine: (2,3) = (2,3) @ (3,3)
 
     J = np.hstack([J_r, J_t])
     return J
@@ -220,7 +167,6 @@ if __name__ == "__main__":
 
     # Compute Analytic Implementations
     J_analytical = PnP_jacobian(K, rvec_true, tvec_true, X)
-    J_analytical_old = PnP_jacobian_old(K, rvec_true, tvec_true, X)
 
     # Compare Results
     def evaluate(name, J_analytic, J_num):
@@ -236,4 +182,3 @@ if __name__ == "__main__":
         print(f"  Mean Diff: {mean_err:.8f}")
 
     evaluate("Analytical vs numeric)", J_analytical, J_numeric)
-    evaluate("Analytical_old vs numeric)", J_analytical_old, J_numeric)

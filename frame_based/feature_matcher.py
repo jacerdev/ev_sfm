@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from utils.preprocessing import load_image, ensure_batch
-from utils.matching import match_features_lightglue, match_features_flann, match_features_BF
+from utils.utils import load_image, ensure_batch
+from utils.matching import match_features_lightglue, match_features_flann
 
 
 class FeatureMatcher:
@@ -24,8 +24,6 @@ class FeatureMatcher:
             index_params = dict(algorithm=1, trees=8)  # KD-tree
             search_params = dict(checks=64)
             self.matcher = cv2.FlannBasedMatcher(index_params, search_params)
-        elif self.matcher_type == "bf":
-            self.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
         else:
             raise ValueError(f"Unknown feature matcher {self.matcher_type}")
 
@@ -42,8 +40,6 @@ class FeatureMatcher:
             return matches[0], matching_scores[0]
         elif self.matcher_type == "flann":
             return match_features_flann(feats1, feats2, self.matcher, robust=self.robust)
-        else: # BF
-            return match_features_BF(feats1, feats2, self.matcher, robust=self.robust)
 
 
 def extract_features_disk(images, disk_model):

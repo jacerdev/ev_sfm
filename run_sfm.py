@@ -2,102 +2,12 @@
 %load_ext autoreload
 %autoreload 2
 %matplotlib inline
-# Force all libraries to use a single thread
-import os
-os.environ["OMP_NUM_THREADS"] = "1"       # OpenMP (used by many OpenCV builds and Scikit-learn)
-os.environ["MKL_NUM_THREADS"] = "1"       # Intel MKL (used by NumPy/SciPy on Intel machines)
-os.environ["OPENBLAS_NUM_THREADS"] = "1"  # OpenBLAS (used by NumPy/SciPy on standard Linux/Docker)
-# Force OpenCV to use a single thread (to make sure cv2.SVDecomp doesnt deadlock)
-import cv2
-cv2.setNumThreads(0)
+from utils.utils import setup_runtime_environment, Timer, colors, color_gen
+setup_runtime_environment()
 
-# Path setup
-import sys
-try: base_path = os.path.dirname(__file__)
-except NameError: base_path = os.getcwd()
-repo_path = os.path.join(base_path, "event_based", "SuperEvent")
-if repo_path not in sys.path: sys.path.append(repo_path)
-
-# Make PyTorch’s CUDA allocator allow GPU memory segments to grow dynamically
-#os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-# Fix seed
-import numpy as np
-import torch
-import random
-np.random.seed(0)
-torch.manual_seed(0)
-random.seed(0)
-
-
-from itertools import count
 import logging
-import sys
-import time
-# Logging Setup
-class ColorFormatter(logging.Formatter):
-    COLORS = {logging.DEBUG: "\033[37m",
-              logging.INFO: "",
-              logging.WARNING: "\033[93m",
-              logging.ERROR: "\033[31m",}
-    RESET = "\033[0m"
-    def format(self, record):
-        msg = super().format(record)
-        color = self.COLORS.get(record.levelno, "")
-        return f"{color}{msg}{self.RESET}"
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(ColorFormatter('%(funcName)s(): %(message)s'))
-logging.getLogger().handlers.clear()
-logging.getLogger().addHandler(handler)
-logging.getLogger().setLevel(logging.DEBUG)
-logging.getLogger('matplotlib').setLevel(logging.WARNING) # silence matplotlib logging
+import numpy as np
 
-# custom profiler
-class Timer:
-    def __init__(self, name="Block"): self.name = name
-
-    def __enter__(self):
-        self.start = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.end = time.perf_counter()
-        self.interval = self.end - self.start
-        logging.debug(f">>> {self.name} duration: {self.interval:.4f} sec <<<")
-
-# Color Generator
-colors = [
-    [255,   0,   0],   # red
-    [  0, 128,   0],   # green
-    [  0,   0, 255],   # blue
-    [  0, 255, 255],   # cyan
-    [255,   0, 255],   # magenta
-    [255, 255,   0],   # yellow
-    [255, 165,   0],   # orange
-    [128,   0, 128],   # purple
-    [165,  42,  42],   # brown
-    [255, 192, 203],   # pink
-    [128, 128, 128],   # gray
-    [  0, 255,   0],   # lime
-    [  0, 128, 128],   # teal
-    [128,   0,   0],   # maroon
-    [  0,   0, 128],   # navy
-    [128, 128,   0],   # olive
-    [ 64, 224, 208],   # turquoise
-    [255, 215,   0],   # gold
-    [148,   0, 211],   # darkviolet
-]
-color_gen = (colors[1:][i % len(colors[1:])] for i in count())
-
-
-from event_based.uzh_dataset import EventDataset
-from frame_based.eth3d_dataset import FrameDataset
-from event_based.feature_matcher import EventFeatureMatcher
-from frame_based.feature_matcher import FeatureMatcher
-from frame_based.pairwise_matcher import PairwiseMatcher
-from event_based.SuperEvent.data_preparation.util.data_io import load_ts_sparse
-from event_based.SuperEvent.util.visualization import ts2image
-from utils.preprocessing import load_image
 from sfm.objects import PinholeCamera, extract_sfm_scene
 from sfm.pipeline import IncrementalSfM
 from utils.optimization import compute_residual_stats
@@ -105,91 +15,18 @@ from utils.visualization import draw_matches, plot_images, plot_sfm, make_border
 
 
 #%% Configuration ###
-dataset_name = "electro_rig_undistorted" # electro_rig_undistorted, delivery_area_undistorted
+dataset_name = "slider_depth" # electro_rig_undistorted, delivery_area_undistorted
                                          # slider_depth, urban, office_zigzag, office_spiral
 USE_CV2 = True
 SKIP_FRAMES = False
-
 FEATURE_BASED = True
-USE_PRECOMPUTED_MATCHES = False
 
 # Load baselines from JSON
-baselines_path = os.path.join(base_path, "baselines.json")
-import json
-with open(baselines_path, "r") as f:
-    baselines_config = json.load(f)
-
-# Pull values based on dataset_name
-baseline = baselines_config.get(dataset_name)
-
-INDEX_0 = baseline["INDEX_0"]
-INDEX_1 = baseline["INDEX_1"]
-INDEX_END = baseline["INDEX_END"]
-FLIP_ORDER = baseline["FLIP_ORDER"]
-#%% Instantiate Dataset
-DATA = "eth3d_frames"  if dataset_name in ["electro_rig_undistorted", "delivery_area_undistorted"] else "uzh_events" # "eth3d_frames", "uzh_events", or "uzh_frames"
-if DATA == "eth3d_frames":
-    ds_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/datasets/ETH3D/" + dataset_name
-    out_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/outputs/ETH3D/" + dataset_name
-    dataset = FrameDataset(ds_dir)
-    image_paths, t_windows = dataset.image_paths, None
-    def open_image(path): return load_image(path)
-
-    if FEATURE_BASED:
-        matcher = FeatureMatcher((dataset.intrinsics['height'], dataset.intrinsics['width']),
-                                 matcher="flann", robust_matching=False)
-    elif USE_PRECOMPUTED_MATCHES: matcher = PairwiseMatcher(extract_matches_func=dataset.match_keypoints)
-    else: matcher = PairwiseMatcher(matches_dir=out_dir+"/matches_loftr")
-    
-    config = {
-        # Pruning matches
-        'MIN_ASSOCIAT_DIST': 5.0, 'PNP_RANSAC_TH': 10.0, 'EPI_RANSAC_TH': 3.0,
-        # Filtering Points
-        'CELL_SIZE': 20, 'OCCUPANCY_CELL_SIZE': 20, 'MIN_ANGLE': 1.0,
-        # Keyframe Selection
-        'MIN_BASELINE': 0.5, 'MIN_OVERLAP': 0.7, 'MIN_VISIBILITY': 0.6, 
-        # Bundle Adjustment
-        'BA_EVERY_N': 4, 'BA_WINDOW': 4,
-    }
-    THICKNESS = 6
-
-else: #if DATA in ["uzh_events", "uzh_frames"]:
-    ds_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/datasets/UZH/" + dataset_name
-    out_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/outputs/UZH/" + dataset_name
-    dataset = EventDataset(ds_dir, out_dir+"/mcts")
-    
-    config = {
-        # Pruning matches
-        'PNP_RANSAC_TH': 10.0, 'EPI_RANSAC_TH': 10.0,
-        # Filtering Points
-        'CELL_SIZE': 1, 'OCCUPANCY_CELL_SIZE': 1, 'MIN_ANGLE': 1., 
-        # Keyframe Selection
-        'MIN_BASELINE': .5, 'MIN_OVERLAP': .99, 'MIN_VISIBILITY': .99,
-        # Bundle Adjustment
-        'BA_EVERY_N': 2, 'BA_WINDOW': 4,
-    }
-    THICKNESS = 2
-
-    if DATA == "uzh_events":
-        image_paths, t_windows = dataset.mcts_paths, dataset.mcts_t_windows
-        def open_image(path): return ts2image(load_ts_sparse(path))
-        
-        root_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/evis_geoba"
-        matcher = EventFeatureMatcher(root_dir, (dataset.intrinsics['height'], dataset.intrinsics['width']),
-                                      matcher="bf", robust_matching=False, windowed_matching=False, window_size=None)
-    elif DATA == "uzh_frames":
-        INDEX_1 *= 2
-        image_paths, t_windows = dataset.image_paths, None
-        def open_image(path): return load_image(path)
-        
-        if FEATURE_BASED:
-            matcher = FeatureMatcher((dataset.intrinsics['height'], dataset.intrinsics['width']),
-                                     matcher="flann", robust_matching=False)
-        else:
-            config['MIN_ASSOCIAT_DIST'] = 5.0
-            matcher = PairwiseMatcher(matches_dir=out_dir+"/matches_loftr")
-
-if FLIP_ORDER: image_paths = image_paths[::-1]
+from config import setup_dataset_and_matcher
+setup_vars = setup_dataset_and_matcher(dataset_name)
+INDEX_0, INDEX_1, INDEX_END = setup_vars['INDEX_0'], setup_vars['INDEX_1'], setup_vars['INDEX_END']
+dataset, image_paths, t_windows = setup_vars['dataset'], setup_vars['image_paths'], setup_vars['t_windows']
+open_image, matcher, config, THICKNESS = setup_vars['open_image'], setup_vars['matcher'], setup_vars['config'], setup_vars['THICKNESS']
 
 #%% Initialize Scene ###
 %matplotlib inline
@@ -200,15 +37,8 @@ distortion_coeffs = np.array(params[4:]) if len(params)>4 else None
 
 camera_model = PinholeCamera(K, distortion_coeffs, dataset.intrinsics['height'], dataset.intrinsics['width'])
 
-
 # Instantiate SfM pipeline
 sfm = IncrementalSfM(camera_model, matcher, config=config, feature_based=FEATURE_BASED, use_cv2=USE_CV2)
-
-# Consistency check
-if INDEX_1 >= len(image_paths):
-    logging.warning(f"INDEX_1 ({INDEX_1}) is out of bounds for dataset length {len(image_paths)}. Adjusting indices.")
-    INDEX_1 = len(image_paths) - 1
-    INDEX_0 = max(0, INDEX_1 - 5)
 
 # Initialize scene
 logging.info(f"Initializing scene with baseline frames {INDEX_0} and {INDEX_1}")
@@ -220,6 +50,7 @@ frame0, frame1, x0, x1 = sfm.bootstrap(frame0_path, frame1_path, t_window0, t_wi
 img0, img1 = open_image(frame0.path), open_image(frame1.path)
 picture = draw_matches(make_border(img0), make_border(img1), x0, x1, thickness=THICKNESS)
 plot_images(picture, title=f"{frame0.path.stem} - {frame1.path.stem}")
+
 
 #%% Incremental SfM ###
 %%prun -s cumulative -l 50
@@ -268,7 +99,7 @@ while 0 <= i < (INDEX_END if INDEX_END != -1 else len(image_paths)):
 #%% Plot Scene ###
 %matplotlib tk
 
-DEPTH_PERCENTILE_RANGE = baseline.get("DEPTH_PERCENTILE_RANGE", (1, 99))
+DEPTH_PERCENTILE_RANGE = (5, 95)
 sfm_scene = extract_sfm_scene(sfm.keyframes_list, sfm.points_list,
                               pt_stride=1, colored_pts=False)
 depths = sfm_scene['points_xyz'][:, 2]
@@ -292,4 +123,3 @@ all_frames_colors[keyframes_mask] = sfm_scene['frames_rgb']
 
 plot_sfm(frames_positions, frames_directions, sfm_scene['points_xyz'], all_frames_colors,camera_size=1,point_size=4)
 
-# %%
