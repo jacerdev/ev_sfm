@@ -9,6 +9,8 @@ __pycache__/
 /data/ETH3D/delivery_area_undistorted
 /data/ETH3D/electro_rig_undistorted
 /data/UZH/urban
+/data/UZH/office_spiral
+/data/configs.txt
 
 # IDE
 /.idea/

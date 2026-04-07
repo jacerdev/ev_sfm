@@ -1,38 +1,45 @@
 # Event-Based & Frame-Based Structure from Motion (SfM)
 
-This repository contains a complete incremental Structure from Motion (SfM) pipeline, designed to process both standard frame-based inputs and asynchronous event-stream data. 
+This repository contains a complete, incremental Structure from Motion (SfM) pipeline designed to process both standard frame-based inputs and asynchronous event-stream data (via MCTS). 
 
-**The core defining feature of this project is the from-scratch implementation of the entire incremental SfM pipeline.** OpenCV can be toggled, but the default pipeline is implemented from scratch relying solely on NumPy and SciPy
+The defining feature of this project is the ground-up implementation of the entire incremental SfM architecture. By implementing the core solvers—rather than relying on high-level libraries—this pipeline serves as a transparent environment for experimenting with unconventional data types like event streams.
+
+Key implementations include:
+- **Mathematical Core:** Algebraic solvers, RANSAC, Non-linear PnP & Triangulation using custom Analytic Jacobians (Generic Levenberg-Marquardt optimization suite), Local Bundle Adjustment.
+- **Multimodal Ingestion:** Natively validates geometry using ETH3D standard frame bounds before deploying on asynchronous event data from UZH via SuperEvent (MCTS).
+- **Temporal Diagnostics:** Custom tooling to statistically evaluate the chronological feature lag and structural collapse induced by dynamic camera kinematics.
 ---
 
-## Setup & Execution
+## 🚀 Quick Start
 
 ### 1. Prepare Environment
 ```bash
 mamba env create -f environment.yml
 mamba activate sfm_env
 ```
-### 2. Run Pipeline
+
+### 2. Configure and Run
+Modify `config.py` to target your desired dataset (`slider_depth`, `urban`, `delivery_area`, etc.), and execute the pipeline:
 ```bash
 python run_sfm.py
 ```
 
 ---
 
-## The Core Pipeline
+## 🖼️ Results
 
-### 1. `run_sfm.py`
-The overarching script that initializes configurations, instantiates the required dataset/matcher objects (event-based or frame-based), and bootstraps the `IncrementalSfM` pipeline. It processes each frame consecutively, handling map initialization, skipping heuristics, tracking, bundle-adjustment scheduling, and 3D visualization.
+### Feature Matching (Frame & Event)
+Matched keypoints for both standard ETH3D images (using kornia's DISK) and SuperEvent-based Multi-Channel Time Surfaces (using SuperEvent).
+````carousel
+![ETH3D (electro_rig) Matches](data/electro_rig_matches.png)
+<!-- slide -->
+![UZH (slider_depth) Matches](data/slider_depth_matches.png)
+````
 
-### 2. `sfm/pipeline.py` & `sfm/routines.py`
-These files drive the logical SfM loop:
-- **`pipeline.py` (IncrementalSfM)**: Maintains the state of the 3D map. Maps 2D tracks across keyframes to global 3D objects, and orchestrates the transition between mapping and tracking.
-- **`routines.py`**: The bridge between state-management and raw math. Handles scene initialization, tracking (`track_frame`), and triangulating new observations (`map_observations`).
-
-### 3. `multiview/`
-- **Epipolar Geometry (`multiview/epipolar.py`)**
-- **Perspective-n-Point (`multiview/pnp.py`)**
-- **Triangulation (`multiview/triangulation.py`)**
-
-
-
+### 3D Reconstruction
+Dense point cloud results generated from scratch using our custom analytical geometry solvers.
+````carousel
+![ETH3D (electro_rig) Reconstruction](data/electro_rig_recon.png)
+<!-- slide -->
+![UZH (slider_depth) Reconstruction](data/slider_depth_recon.png)
+````

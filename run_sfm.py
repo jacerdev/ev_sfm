@@ -16,7 +16,7 @@ from utils.visualization import draw_matches, plot_images, plot_sfm, make_border
 
 #%% Configuration ###
 dataset_name = "slider_depth" # electro_rig_undistorted, delivery_area_undistorted
-                                         # slider_depth, urban, office_zigzag, office_spiral
+                                         # slider_depth, urban, office_spiral
 USE_CV2 = True
 SKIP_FRAMES = False
 FEATURE_BASED = True
@@ -25,7 +25,7 @@ FEATURE_BASED = True
 from config import setup_dataset_and_matcher
 setup_vars = setup_dataset_and_matcher(dataset_name)
 INDEX_0, INDEX_1, INDEX_END = setup_vars['INDEX_0'], setup_vars['INDEX_1'], setup_vars['INDEX_END']
-dataset, image_paths, t_windows = setup_vars['dataset'], setup_vars['image_paths'], setup_vars['t_windows']
+dataset, image_paths, t_windows, out_dir = setup_vars['dataset'], setup_vars['image_paths'], setup_vars['t_windows'], setup_vars['out_dir']
 open_image, matcher, config, THICKNESS = setup_vars['open_image'], setup_vars['matcher'], setup_vars['config'], setup_vars['THICKNESS']
 
 #%% Initialize Scene ###
@@ -49,7 +49,7 @@ frame0, frame1, x0, x1 = sfm.bootstrap(frame0_path, frame1_path, t_window0, t_wi
 # Plot
 img0, img1 = open_image(frame0.path), open_image(frame1.path)
 picture = draw_matches(make_border(img0), make_border(img1), x0, x1, thickness=THICKNESS)
-plot_images(picture, title=f"{frame0.path.stem} - {frame1.path.stem}")
+plot_images(picture, title=f"{frame0.path.stem} - {frame1.path.stem}", size=(12, 6))
 
 
 #%% Incremental SfM ###
@@ -80,6 +80,7 @@ while 0 <= i < (INDEX_END if INDEX_END != -1 else len(image_paths)):
         logging.warning(f"Global residual stats ({len(sfm.keyframes_list)} keyframes, {len(sfm.points_list)} points): Median Error= {median_err:.2f}, Robust SD= {1.4826 * mad:.2f}, RMSE= {rmse:.2f}")
 
     # Plot
+    continue
     FEW_2D3D, FEW_2D2D = False, False
     if len(results['tracking']['kps1']) < 30: logging.error(f"Too few 2D-3D matches extracted: {len(results['tracking']['kps1'])}"); FEW_2D3D=True
     elif len(results['mapping']['kps1']) < 20: logging.error(f"Too few 2D-2D matches extracted: {len(results['mapping']['kps1'])}"); FEW_2D2D=True
@@ -123,3 +124,29 @@ all_frames_colors[keyframes_mask] = sfm_scene['frames_rgb']
 
 plot_sfm(frames_positions, frames_directions, sfm_scene['points_xyz'], all_frames_colors,camera_size=1,point_size=4)
 
+
+#%% Save state
+import pickle
+with open(out_dir + "/sfm_state.pkl", "wb") as f:
+    pickle.dump(sfm.get_state(), f)
+
+#%% Load state
+
+import pickle
+with open(out_dir + "/sfm_state.pkl", "rb") as f:
+    state = pickle.load(f)
+
+params = dataset.intrinsics['params'] # fx, fy, cx, cy, k1, k2, p1, p2, k3
+K = np.array([[params[0], 0, params[2]], [0, params[1], params[3]], [0, 0, 1]])
+distortion_coeffs = np.array(params[4:]) if len(params)>4 else None
+camera_model = PinholeCamera(K, distortion_coeffs, dataset.intrinsics['height'], dataset.intrinsics['width'])
+
+sfm = IncrementalSfM(camera_model, matcher)
+sfm.__dict__.update(state)
+
+#%%
+%matplotlib inline
+from utils.analysis_temporal_bias import collect_temporal_statistics, plot_temporal_diagnostics
+all_rel_times, pairwise_diffs = collect_temporal_statistics(sfm.points_list, sfm.keyframes_id_map, dataset.events_stream, radius=5)
+plot_temporal_diagnostics(all_rel_times, pairwise_diffs)
+# %%

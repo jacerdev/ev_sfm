@@ -16,8 +16,8 @@ def setup_dataset_and_matcher(dataset_name, feature_based=True):
         INDEX_END = -1
         FLIP_ORDER = False
 
-        ds_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/datasets/ETH3D/" + dataset_name
-        out_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/outputs/ETH3D/" + dataset_name
+        ds_dir = "data/ETH3D/" + dataset_name
+        out_dir = "data/outputs/ETH3D/" + dataset_name
         dataset = FrameDataset(ds_dir)
         image_paths, t_windows = dataset.image_paths, None
         def open_image(path): return load_image(path)
@@ -43,12 +43,12 @@ def setup_dataset_and_matcher(dataset_name, feature_based=True):
 
     else: #if DATA in ["uzh_events", "uzh_frames"]:
         INDEX_0 = 0
-        INDEX_1 = 3
+        INDEX_1 = 3 # (try 3 for slider_depth, 10 for urban / office_spiral dataset)
         INDEX_END = -1
-        FLIP_ORDER = False # (try it for urban dataset)
+        FLIP_ORDER = False # (try True for urban dataset)
         
-        ds_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/datasets/UZH/" + dataset_name
-        out_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/outputs/UZH/" + dataset_name
+        ds_dir = "data/UZH/" + dataset_name
+        out_dir = "data/outputs/UZH/" + dataset_name
         dataset = EventDataset(ds_dir, out_dir+"/mcts")
         
         config = {
@@ -67,8 +67,7 @@ def setup_dataset_and_matcher(dataset_name, feature_based=True):
             image_paths, t_windows = dataset.mcts_paths, dataset.mcts_t_windows
             def open_image(path): return ts2image(load_ts_sparse(path))
             
-            root_dir = "/home/jacer/Documents/TU-Berlin/13.WS2526/EventPJ/workspace/evis_geoba"
-            matcher = EventFeatureMatcher(root_dir, (dataset.intrinsics['height'], dataset.intrinsics['width']),
+            matcher = EventFeatureMatcher((dataset.intrinsics['height'], dataset.intrinsics['width']),
                                           robust_matching=False, windowed_matching=False, window_size=None)
         elif DATA == "uzh_frames":
             INDEX_1 *= 2
@@ -86,6 +85,6 @@ def setup_dataset_and_matcher(dataset_name, feature_based=True):
     
     return {
         'INDEX_0': INDEX_0, 'INDEX_1': INDEX_1, 'INDEX_END': INDEX_END,
-        'dataset': dataset, 'image_paths': image_paths, 't_windows': t_windows,
+        'dataset': dataset, 'image_paths': image_paths, 't_windows': t_windows, 'out_dir': out_dir,
         'open_image': open_image, 'matcher': matcher, 'config': config, 'THICKNESS': THICKNESS
     }

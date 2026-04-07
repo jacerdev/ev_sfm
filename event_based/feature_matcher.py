@@ -16,18 +16,19 @@ def submodule_path_setup():
     feature_matcher_dir = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd() / "event_based"
     repo_path = str(feature_matcher_dir / "SuperEvent")
     if repo_path not in sys.path: sys.path.append(repo_path)
+    return repo_path
 
-submodule_path_setup()
+repo_path = submodule_path_setup()
 from event_based.SuperEvent.data_preparation.util.data_io import load_ts_sparse, save_ts_sparse
 from event_based.SuperEvent.models.super_event import SuperEvent, SuperEventFullRes
 from event_based.SuperEvent.ts_generation.generate_ts import TsGenerator
 
 
 class EventFeatureMatcher:
-    def __init__(self, root_dir, image_shape, robust_matching=False, windowed_matching=False, window_size=None):
-        config_path = root_dir+"/event_based/SuperEvent/config/super_event.yaml"
-        backbone_config_path = root_dir+"/event_based/SuperEvent/config/backbones/maxvit.yaml"
-        model_path = root_dir+"/event_based/SuperEvent/saved_models/super_event_weights.pth"
+    def __init__(self, image_shape, robust_matching=False, windowed_matching=False, window_size=None):
+        config_path = repo_path + "/config/super_event.yaml"
+        backbone_config_path = repo_path + "/config/backbones/maxvit.yaml"
+        model_path = repo_path + "/saved_models/super_event_weights.pth"
 
         # extractor
         pad_h, pad_w = (40 - image_shape[0] % 40) % 40, (40 - image_shape[1] % 40) % 40 # Pad to multiple of 40

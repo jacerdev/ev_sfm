@@ -18,7 +18,7 @@ class IncrementalSfM:
         # invariant parameters
         self.camera_model = camera_model
         self.matcher = matcher
-        self.cfg = config if config is not None else self._get_config()
+        self.cfg = config #if config is not None else self._get_config()
         self.feature_based = feature_based
         self.use_cv2 = use_cv2
 
@@ -258,60 +258,24 @@ class IncrementalSfM:
             return {'kps': kps2[mask_triang], 'pts_idxs': indices_triang[mask_triang],
                     'kps1': kps1[~mask_triang], 'kps2': kps2[~mask_triang]}
 
-    """    def _get_config(self):
+    def get_state(self):
         return {
-            # Matching:
-            'FEATURE_BASED': True,
-            'USE_CV2': False,
-            'CELL_SIZE': 20,
-            'OCCUPANCY_CELL_SIZE': 5,
-            # non feature based matching:
-            'MIN_ASSOCIAT_DIST': 5.0,
-            'CHEAT': True,
+            # camera
+            "K": self.K,
+            "dist_coeffs": self.dist_coeffs,
+            "image_shape": self.image_shape,
 
-            # Tracking:
-            'PNP_RANSAC_TH': 5.0,
-            'PNP_INIT_ERR': 5.0,
+            # core SfM results
+            "keyframes_list": self.keyframes_list,
+            "points_list": self.points_list,
+            "frames_list": self.frames_list,
 
-            # Triangulation:
-            'EPI_RANSAC_TH': 3.0,
-            'MIN_BASELINE': 0.5,
-            'MIN_ANGLE': 1,
+            # mappings (optional but useful)
+            "keyframes_id_map": self.keyframes_id_map,
+            "points_id_map": self.points_id_map,
 
-            # keyframe:
-            'MIN_OVERLAP': 0.7,
-            'MIN_VISIBILITY': 0.6,
-
-            # Bundle adjustment:
-            'BA_EVERY_N': 4,
-            'BA_WINDOW': 4,
+            # misc
+            "cfg": self.cfg,
+            "feature_based": self.feature_based,
+            "use_cv2": self.use_cv2,
         }
-
-     eth3d delivery area
-    {
-    # Matching:
-    'FEATURE_BASED': False,
-    'CELL_SIZE': 30,
-    'OCCUPANCY_CELL_SIZE': 20,
-    # non feature based matching:
-    'MIN_ASSOCIAT_DIST': 5.0,
-    'CHEAT': False,
-
-    # Tracking:
-    'PNP_RANSAC_TH': 5.0,
-    'PNP_INIT_ERR': 5.0,
-
-    # Triangulation:
-    'EPI_RANSAC_TH': 3.0,
-    'MIN_BASELINE': 0.5,
-    'MIN_ANGLE': 1,
-
-    # keyframe:
-    'MIN_OVERLAP': 0.7,
-    'MIN_VISIBILITY': 0.6,
-
-    # Bundle adjustment:
-    'BA_EVERY_N': 4,
-    'BA_WINDOW': 4,
-}
-    """
