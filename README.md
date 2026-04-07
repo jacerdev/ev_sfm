@@ -28,18 +28,18 @@ python run_sfm.py
 
 ## 🖼️ Results
 
-### Feature Matching (Frame & Event)
+### 1. Feature Matching (Frame & Event)
 Matched keypoints for both standard ETH3D images (using kornia's DISK) and SuperEvent-based Multi-Channel Time Surfaces (using SuperEvent).
-````carousel
-![ETH3D (electro_rig) Matches](data/electro_rig_matches.png)
-<!-- slide -->
-![UZH (slider_depth) Matches](data/slider_depth_matches.png)
-````
 
-### 3D Reconstruction
+| ETH3D (electro_rig) Matches | UZH (slider_depth) Matches |
+|:---:|:---:|
+| ![Matches](data/electro_rig_matches.png) | ![Matches](data/slider_depth_matches.png) |
+
+---
+
+### 2. 3D Reconstruction
 Dense point cloud results generated from scratch using our custom analytical geometry solvers.
-````carousel
-![ETH3D (electro_rig) Reconstruction](data/electro_rig_recon.png)
-<!-- slide -->
-![UZH (slider_depth) Reconstruction](data/slider_depth_recon.png)
-````
+
+| ETH3D (electro_rig) Recon | UZH (slider_depth) Recon |
+|:---:|:---:|
+| ![Recon](data/electro_rig_recon.png) | ![Recon](data/slider_depth_recon.png) |
