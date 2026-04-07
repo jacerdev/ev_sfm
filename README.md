@@ -2,12 +2,12 @@
 
 This repository contains a complete, incremental Structure from Motion (SfM) pipeline designed to process both standard frame-based inputs and asynchronous event-stream data (via MCTS). 
 
-The defining feature of this project is the ground-up implementation of the entire incremental SfM architecture. By implementing the core solvers—rather than relying on high-level libraries—this pipeline serves as a transparent environment for experimenting with unconventional data types like event streams.
+The defining feature of this project is the ground-up implementation of the entire incremental SfM architecture. By implementing the core solvers, rather than relying on high-level libraries, this pipeline serves as a transparent environment for experimenting with unconventional data types like event streams.
 
 Key implementations include:
 - **Mathematical Core:** Algebraic solvers, RANSAC, Non-linear PnP & Triangulation using custom Analytic Jacobians (Generic Levenberg-Marquardt optimization suite), Local Bundle Adjustment.
-- **Multimodal Ingestion:** Natively validates geometry using ETH3D standard frame bounds before deploying on asynchronous event data from UZH via SuperEvent (MCTS).
-- **Temporal Diagnostics:** Custom tooling to statistically evaluate the chronological feature lag and structural collapse induced by dynamic camera kinematics.
+- **Multimodal data handling:** Natively validates geometry using ETH3D standard frame bounds before deploying on asynchronous event data from UZH via SuperEvent (MCTS).
+- **Temporal Diagnostics:** Simple custom tooling to statistically evaluate the chronological feature lag of matched keypoints and its potential impact of artificially induced depth shrinkage / expansion.
 ---
 
 ## 🚀 Quick Start
