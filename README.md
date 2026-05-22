@@ -10,6 +10,15 @@ Key implementations include:
 - **Temporal Diagnostics:** Simple custom tooling to statistically evaluate the chronological feature lag of matched keypoints and its potential impact of artificially induced depth shrinkage / expansion.
 ---
 
+
+## 📄 Technical Report
+
+A detailed description of the architecture, mathematical derivations, experiments, and evaluation is available here:
+
+[Project Report (PDF)](docs/report.pdf)
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Prepare Environment
